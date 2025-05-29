@@ -9,6 +9,6 @@ function tx_ofdm = transmitter(N_subcarriers,occupied_subcarriers,mod_order,cp_l
     t(1:occupied_subcarriers) = mod_data;               % = N_subcarriers
 
     time_data = ifft(t,N_subcarriers);
-    tx_ofdm = [time_data(end - cp_len + 1 : end); time_data];
+    tx_ofdm = [time_data(end - cp_len + 1 : end); time_data].';
 end
 

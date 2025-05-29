@@ -1,0 +1,6 @@
+function alpha = Jammer_coeff_ratio_estimation(hpilot_signal)
+%JAMMER_COEFF_ESTIMATION Estimates jammer coeff ratio.
+    y = receiver()
+
+end
+

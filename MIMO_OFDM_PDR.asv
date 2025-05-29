@@ -1,4 +1,4 @@
-jam_power = 1000000000000000000000000000; 
+jam_power = 0; 
 N_packets = 500;
 mod_order = 2;
 occupied_subcarriers = 48;
@@ -7,34 +7,25 @@ cp_len = 16;
 n_trials = 10;
 for run = 1:n_trials
     success=0;
+    pilot = [1;0]
     for packets = 1: N_packets
         %Channel Coeffs -- Jammer coeffs not known to us
         hs = (randn(2,1) + 1i*randn(2,1)) / sqrt(2); % ------ sender coeff
         hj = (randn(2,1) + 1i*randn(2,1)) / sqrt(2); % ------ jammer coeff
 
-        %Jammer config
-        j = jammer(N_subcarriers,cp_len,jam_power);
-
-        %Pilot Sending:
-        pilot = zeros(1,N_subcarriers+cp_len);
-        pilot(2:15) = 1;
-        mixed_signal = receiver(hs,hj,pilot,j);
-
         %Transmitter config
         data_bits = randi([0 1], occupied_subcarriers, 1);
-        t = transmitter(N_subcarriers, occupied_subcarriers, mod_order,cp_len,data_bits);
+        trans_signal = hs*transmitter(N_subcarriers, occupied_subcarriers, mod_order,cp_len,data_bits);
 
-        
+        %Jammer config
+        jam_signal = hj*jammer(N_subcarriers,cp_len,jam_power);
 
         %Receiver config
-        y = receiver(hs,hj,t,j);
-        %Jammer coeff ratio
-        alpha = Jammer_coeff_ratio_estimation(hs,pilot,mixed_signal);
-        rx_data = Interference_cancellation(y,hs,alpha,cp_len,N_subcarriers,occupied_subcarriers);
+        y = receiver(trans_signal,jam_signal);
+        rx_data = Interference_cancellation(y,hs,hj,cp_len,N_subcarriers,occupied_subcarriers);
         rx_bits = pskdemod(rx_data, mod_order);
         if all(rx_bits.' == data_bits)
             success = success + 1;
         end
-        fprintf("Packet transmission done \n");
     end
 end

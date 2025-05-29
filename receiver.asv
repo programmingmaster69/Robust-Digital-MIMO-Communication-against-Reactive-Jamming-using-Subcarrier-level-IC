@@ -1,0 +1,5 @@
+function Y = receiver(Txs,Txj)
+%RECEIVER Receiver antennas modelling
+    Y= Txs + Txj
+end
+

@@ -1,11 +1,11 @@
-jam_power = 0; 
+jam_power = 0.0001; 
 N_packets = 500;
 mod_order = 2;
 occupied_subcarriers = 48;
 N_subcarriers = 64;
 cp_len = 16;
 n_trials = 10;
-pdr_results = zeros(n_trials,1);
+pdr_results = zeros(1,n_trials);
 for run = 1:n_trials
     success=0;
     for packets = 1: N_packets
@@ -14,26 +14,26 @@ for run = 1:n_trials
         hj = (randn(2,1) + 1i*randn(2,1)) / sqrt(2); % ------ jammer coeff
 
         %Jammer config
-        j = jammer(N_subcarriers,cp_len,jam_power);
+        j = jammer(N_subcarriers,jam_power);
 
         %Pilot Sending:
-        pilot = zeros(1,N_subcarriers+cp_len);
+        pilot = zeros(1,N_subcarriers);
         pilot(2:15) = 1;
-        mixed_signal = receiver(hs,hj,pilot,j,N_subcarriers,cp_len);
+        mixed_signal = receiver(hs,hj,pilot,j,N_subcarriers);
 
         %Transmitter config
-        data_bits = randi([0 1], occupied_subcarriers, 1);
-        t = transmitter(N_subcarriers, occupied_subcarriers, mod_order,cp_len,data_bits);
-
-        
+        data_bits = randi([0 1], 1, occupied_subcarriers);
+        t = transmitter(occupied_subcarriers, mod_order,cp_len,data_bits);
 
         %Receiver config
-        y = receiver(hs,hj,t,j,N_subcarriers,cp_len);
+        y = receiver(hs,hj,t,j,N_subcarriers);
+
         %Jammer coeff ratio
         alpha = Jammer_coeff_ratio_estimation(hs,pilot,mixed_signal);
-        rx_data = Interference_cancellation(y,hs,alpha,cp_len,N_subcarriers,occupied_subcarriers);
+        rx_data = Interference_cancellation(y,hs,alpha,cp_len,occupied_subcarriers);
         rx_bits = pskdemod(rx_data, mod_order);
-        if all(rx_bits.' == data_bits)
+
+        if all(rx_bits == data_bits)
             success = success + 1;
         end
     end

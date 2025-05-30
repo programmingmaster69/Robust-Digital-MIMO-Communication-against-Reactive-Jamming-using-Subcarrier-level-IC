@@ -3,7 +3,7 @@
 3)Channel coefficient estimation -- completed the model, just need to implement it for odd packet intervals
 4)Channel Equalization
 5)Sender channel estimation at even packet intervals
-6)Change subcarrier length to N_subcarriers from N_subcarriers+cp_len
+6)Change subcarrier length to N_subcarriers from N_subcarriers+cp_len -- done
 7)Implement Reactive jammer - i)  Sensing arrival of packets just after preamble - 1ms to detect the signal for a 0.6 detection probability and −110dBm signal strength
                               ii) Strategy of shrinking the angle btw. sender and jammer signal.
 8) Jammer signal detection by the defense mechanism.

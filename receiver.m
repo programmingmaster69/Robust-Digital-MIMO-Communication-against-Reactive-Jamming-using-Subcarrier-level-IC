@@ -1,5 +1,6 @@
-function Y = receiver(hs,hj,Txs,Txj)
+function Y = receiver(hs,hj,Txs,Txj,N_subcarriers,cp_len)
 %RECEIVER Receiver antennas modelling
-    Y= hs*Txs + hj*Txj;
+    noise = randn(1, N_subcarriers+cp_len);
+    Y= hs*Txs + hj*Txj + noise;
 end
 

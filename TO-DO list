@@ -1,0 +1,13 @@
+1)Signal of interest Decoding -- done
+2)Random Pilot insertion -- Pilot insertion completed, randomness needs to be executed
+3)Channel coefficient estimation -- completed the model, just need to implement it for odd packet intervals
+4)Channel Equalization
+5)Sender channel estimation at even packet intervals
+6)Change subcarrier length to N_subcarriers from N_subcarriers+cp_len
+7)Implement Reactive jammer - i)  Sensing arrival of packets just after preamble - 1ms to detect the signal for a 0.6 detection probability and −110dBm signal strength
+                              ii) Strategy of shrinking the angle btw. sender and jammer signal.
+8) Jammer signal detection by the defense mechanism.
+9)Develop a feedback mechanism for Sender signal enhancement, which allows sender to rotate the transmitted signal in a direction orthogonal to jammed signal.
+10)Extend this framework for multiple jammers.
+11) Consider the case of advanced jammers, (Short-burst jamming)
+12) Plot the graphs for each type of case.

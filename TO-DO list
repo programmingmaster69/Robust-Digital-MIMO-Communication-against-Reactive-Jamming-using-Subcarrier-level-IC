@@ -11,3 +11,4 @@
 10)Extend this framework for multiple jammers.
 11) Consider the case of advanced jammers, (Short-burst jamming)
 12) Plot the graphs for each type of case.
+13)Issue in jammer_coeff_ratio_estimation - alpha = jam_signal(1)/jam_signal(2); Line 4

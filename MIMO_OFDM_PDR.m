@@ -1,4 +1,7 @@
-jam_power = 0.0001; 
+clear all;
+clc
+jam_power_values = [10000000000000,50000000000000,100000000000000,150000000000000,200000000000000,300000000000000,350000000000000,400000000000000,450000000000000,500000000000000]; 
+OFDM_symbols = 14;
 N_packets = 500;
 mod_order = 2;
 occupied_subcarriers = 48;
@@ -6,39 +9,61 @@ N_subcarriers = 64;
 cp_len = 16;
 n_trials = 10;
 pdr_results = zeros(1,n_trials);
+pilot_rows = [1,6,11];
+
 for run = 1:n_trials
-    success=0;
+    Packet_success=0;
     for packets = 1: N_packets
-        %Channel Coeffs -- Jammer coeffs not known to us
-        hs = (randn(2,1) + 1i*randn(2,1)) / sqrt(2); % ------ sender coeff
-        hj = (randn(2,1) + 1i*randn(2,1)) / sqrt(2); % ------ jammer coeff
+        success=0;
+        data_bits = randi([0 1], OFDM_symbols, occupied_subcarriers);
+        for i = pilot_rows
+            data_bits(i,:) = zeros(1,occupied_subcarriers);
+        end
+        
+        for symbol = 1:OFDM_symbols
 
-        %Jammer config
-        j = jammer(N_subcarriers,jam_power);
+            current_symbol = data_bits(symbol,:);
 
-        %Pilot Sending:
-        pilot = zeros(1,N_subcarriers);
-        pilot(2:15) = 1;
-        mixed_signal = receiver(hs,hj,pilot,j,N_subcarriers);
-
-        %Transmitter config
-        data_bits = randi([0 1], 1, occupied_subcarriers);
-        t = transmitter(occupied_subcarriers, mod_order,cp_len,data_bits);
-
-        %Receiver config
-        y = receiver(hs,hj,t,j,N_subcarriers);
-
-        %Jammer coeff ratio
-        alpha = Jammer_coeff_ratio_estimation(hs,pilot,mixed_signal);
-        rx_data = Interference_cancellation(y,hs,alpha,cp_len,occupied_subcarriers);
-        rx_bits = pskdemod(rx_data, mod_order);
-
-        if all(rx_bits == data_bits)
-            success = success + 1;
+            %Channel Coeffs -- Jammer coeffs not known to us
+            hs = (randn(2,1) + 1i*randn(2,1)) / sqrt(2); % ------ sender coeff
+            hj = (randn(2,1) + 1i*randn(2,1)) / sqrt(2); % ------ jammer coeff
+            
+            %Jammer config
+            j = jammer(N_subcarriers,jam_power_values(run));
+    
+            %Transmitter config
+            t = transmitter(occupied_subcarriers, mod_order,cp_len,current_symbol);
+    
+            %Receiver config
+            y = receiver(hs,hj,t,j,N_subcarriers);
+    
+            %Jammer coeff ratio
+            %if ismember(symbol,pilot_rows)
+            alpha = Jammer_coeff_ratio_estimation(hs,t,y);
+            %end
+            rx_data = Interference_cancellation(y,hs,alpha,cp_len,occupied_subcarriers);
+            rx_bits = pskdemod(rx_data, mod_order);
+    
+            if all(rx_bits == data_bits(symbol,:))
+                success = success + 1;
+            end
+        end
+        if success == 14
+            Packet_success = Packet_success + 1;
         end
     end
-    pdr = success / N_packets;
+    pdr = Packet_success / N_packets;
     pdr_results(run) = pdr;
     fprintf("Run %d: PDR = %.2f%%\n", run, pdr * 100);
 end
 fprintf("Average PDR across %d runs: %.2f%%\n", n_trials, mean(pdr_results)*100);
+
+% === Plotting ===
+figure;
+semilogx(jam_power_values, pdr_results* 100,'-o','LineWidth',2);
+grid on;
+xlabel('Jamming Power');
+ylabel('Packet Delivery Rate (PDR) [%]');
+title('PDR vs. Jamming Power');
+xlim([5000000000000 500000000000000]);
+ylim([0 105])

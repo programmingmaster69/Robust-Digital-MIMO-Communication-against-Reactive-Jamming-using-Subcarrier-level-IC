@@ -26,9 +26,9 @@ for run = 1:n_trials
         %Channel Coeffs -- Jammer coeffs not known to us
         
         hs = (randn(2,1) + 1i*randn(2,1)) / sqrt(2);    % ------ sender coeff
-        Hs = sqrt(1/N_subcarriers)*[fft(hs(1),N_subcarriers); fft(hs(2),N_subcarriers)];  % ------ Freq domain
+        Hs = sqrt(1/N_subcarriers)*[fft(hs(1,:).',N_subcarriers).'; fft(hs(2,:).',N_subcarriers).'];  % ------ Freq domain
         hj = (randn(2,1) + 1i*randn(2,1)) / sqrt(2);    % ------ jammer coeff
-        Hj = sqrt(1/N_subcarriers)*[fft(hj(1),N_subcarriers); fft(hj(2),N_subcarriers)];  % ------ Freq domain
+        Hj = sqrt(1/N_subcarriers)*[fft(hj(1,:).',N_subcarriers).'; fft(hj(2,:).',N_subcarriers).'];  % ------ Freq domain
         
         for symbol = 1:OFDM_symbols
 
@@ -41,13 +41,13 @@ for run = 1:n_trials
             t = transmitter(occupied_subcarriers, mod_order,cp_len,current_symbol);
     
             %Receiver config
-            y = receiver(hs,hj,t,j,N_subcarriers,occupied_subcarriers,cp_len,noise_power);
+            y = receiver(hs,hj,t,j,N_subcarriers,occupied_subcarriers,noise_power);
     
             %Jammer coeff ratio
             if ismember(symbol,pilot_rows)
-                pilot_signal = pskmod(pilot_matrix.',mod_order).';
-                alpha = Jammer_coeff_ratio_estimation(Hs(:,cp_len+1:end),pilot_signal,y);
-                mean(alpha)
+                pilot_signal_cp = t;
+                pilot_signal = pilot_signal_cp(cp_len+1:end);
+                alpha = Jammer_coeff_ratio_estimation(Hs,pilot_signal,y);
             end
             rx_data = Interference_cancellation(y,Hs,alpha,cp_len,occupied_subcarriers, N_subcarriers);
             rx_bits = pskdemod(rx_data, mod_order);
@@ -101,7 +101,7 @@ function alpha = Jammer_coeff_ratio_estimation(Hs,pilot,y)
 end
 
 %Receiver ---------------------------------------------
-function Y = receiver(hs,hj,Txs,Txj,N_subcarriers,occupied_subcarriers,cp_len,noise_power)
+function Y = receiver(hs,hj,Txs,Txj,N_subcarriers,occupied_subcarriers,noise_power)
 %RECEIVER Receiver antennas modelling
     
     noise = sqrt(noise_power)*(randn(2, N_subcarriers) + 1i*randn(2,N_subcarriers));

@@ -1,6 +1,7 @@
 clc
 clear all
 %Problem - At low jamming powers, alpha estimation is poor.
+
 %==== Defining parameters =====%
 N = 10^4; % Total symbols per transmission
 Num_scs = 64;
@@ -9,75 +10,119 @@ Num_pckts = 500;
 N_sym_pckt = 14;
 N_fft = Occupied_scs;
 cp_len = 16;
-num_trails = 100;
+num_trails = 2;
 Mod_ord = 2;
 N_bits_per_symb = Occupied_scs; % for BPSK
-noise_power = 0;
-tx_amp = 0.5;
-jamming_amp = 0:0.1:1;
+noise_power = 0.001;
+tx_power = [1,4,8,12,16,20,24,28,32,36];
+snr_dB = -5:5:55;
+SNR_dB = snr_dB + 10*log10(Occupied_scs/Num_scs);
+
+%Pilot Info
 pilot_pos = [1,5,9,13];
 pilot_matrix = ones(Occupied_scs,1);
 pilot_matrix(Occupied_scs/2 - 6: Occupied_scs/2 + 6) = -1;
+
+%Jammer Info
 jammer_type = 'Barrage';
+jamming_power = zeros(1,2);
+for i = 1: num_trails
+    jamming_power(i) = 20*(i-1);
+end
+% PDR Results
+pdr_results = zeros(num_trails,length(SNR_dB));
+final_pdr = zeros(1,length(SNR_dB));
 %==== MIMO parameters ====%
 n_tx = 1;
 n_rx = 2;
-for iter = 1:num_trails
-    
-    ip_data = rand(1,N_bits_per_symb*N) > 0.5;
-    ip_data = double(ip_data);
-    ip_symbols = pskmod(ip_data,Mod_ord);
-    parallel_data = reshape(ip_symbols, N_bits_per_symb,[]);
-    if strcmp(jammer_type, 'Barrage')
-        jammer = barrageJammer('ERP',100, 'SamplesPerFrame',Num_scs);
-    end
-    for p = 1:Num_pckts
-        % == Defining channel per each coherence interval (each packet) ==%
-        h_s = (randn(n_rx,n_tx) + 1j *randn(n_rx,n_tx))/sqrt(2);
-        h_j =  (randn(n_rx,n_tx) + 1j *randn(n_rx,n_tx))/sqrt(2);
-        Hs = zeros(n_rx,N_fft);
-        Hj = zeros(n_rx,N_fft);
-        for i = 1:n_rx
-            Hs(i,:) = sqrt(1/Occupied_scs)*fft(h_s(i), N_fft);
-            Hj(i,:) = sqrt(1/Occupied_scs)*fft(h_j(i), N_fft);
-        end
-        for s = 1:N_sym_pckt
-            %=== OFDM transmission starts here ====%
-            jammer_signal = jammer().';
-            jammer_signal(1:2) = 0;
-            if ismember(s,pilot_pos)
-                parallel_data(:,(p-1)*(N_sym_pckt)+ s) = pilot_matrix;
-            end
-            time_data = sqrt(Occupied_scs)*ifft(parallel_data(:,(p-1)*(N_sym_pckt)+ s), N_fft);
-            serial_data = time_data.';
-            serial_tx_data = [serial_data(end-cp_len+1:end) serial_data]; % after cp addition
-            % === computing the received signal at rx antennas
-            n = sqrt(noise_power/2)*((randn(n_rx,Num_scs) + 1j *randn(n_rx,Num_scs)));
-            rx_raw_data = h_s * serial_tx_data + h_j * jammer_signal + n;
-            rx_serial_data = zeros(n_rx, Occupied_scs);
-            rx_fft = rx_serial_data.';
-            for i = 1:n_rx
-                 rx_serial_data(i,:) = rx_raw_data(i,cp_len+1:end);
-                 rx_fft(:,i) = sqrt(1/Occupied_scs)*fft(rx_serial_data(i).',N_fft);
-            end
-            % === Alpha estimation == %
-            if ismember(s, pilot_pos)
-                y = rx_fft;  % Already computed
-                alpha = zeros(N_bits_per_symb,1);
-
-                for k = 1:N_bits_per_symb
-                    r1 = y(k,1) - Hs(1,k)*pilot_matrix(k);
-                    r2 = y(k,2) - Hs(2,k)*pilot_matrix(k);
-                    alpha(k) = r1 / r2;
-                end
-
-                % Compare with true alpha (if known)
-                true_alpha = Hj(1,:) ./ Hj(2,:);
-                disp([alpha(10), true_alpha(10)]);  % Example debug
-            end
-
-        end
+% for jam_p = 1:2
+    for iter = 1:num_trails
+        for i = 1: length(SNR_dB)
         
+            ip_data = rand(1,N_bits_per_symb*N) > 0.5;
+            ip_data = double(ip_data);
+            ip_symbols = pskmod(ip_data,Mod_ord);
+            parallel_data = reshape(ip_symbols, N_bits_per_symb,[]);
+            if strcmp(jammer_type, 'Barrage')
+                jammer = barrageJammer('ERP',0, 'SamplesPerFrame',Num_scs);
+            end
+            Packet_success = 0;
+            for p = 1:Num_pckts
+            % == Defining channel per each coherence interval (each packet) ==%
+                h_s = (randn(n_rx,n_tx) + 1j *randn(n_rx,n_tx))/sqrt(2);
+                h_j =  (randn(n_rx,n_tx) + 1j *randn(n_rx,n_tx))/sqrt(2);
+                Hs = zeros(n_rx,N_fft);
+                Hj = zeros(n_rx,N_fft);
+                for j = 1:n_rx
+                    Hs(j,:) = sqrt(1/Occupied_scs)*fft(h_s(j), N_fft);
+                    Hj(j,:) = sqrt(1/Occupied_scs)*fft(h_j(j), N_fft);
+                end
+                symbol_success = 0;
+                for s = 1:N_sym_pckt
+                % === OFDM transmission starts here === %
+                    jammer_signal = jammer().';
+                    jammer_signal(1:2) = 0;
+                    if ismember(s,pilot_pos)
+                        parallel_data(:,(p-1)*(N_sym_pckt)+ s) = pilot_matrix;
+                    end
+                    time_data = sqrt(Occupied_scs)*ifft(parallel_data(:,(p-1)*(N_sym_pckt)+ s), N_fft);
+                    serial_data = time_data.';
+                    serial_tx_data = [serial_data(end-cp_len+1:end) serial_data]; % after cp addition
+                % === Computing the received signal at rx antennas === %
+                    n = sqrt(noise_power/2)*((randn(n_rx,Num_scs) + 1j *randn(n_rx,Num_scs)));
+                    rx_raw_data = sqrt(Num_scs/Occupied_scs)*h_s * serial_tx_data + h_j * jammer_signal + 10^(-SNR_dB(i)/20)*n;
+                    rx_serial_data = zeros(n_rx, Occupied_scs);
+                    rx_fft = rx_serial_data.';
+                    for j = 1:n_rx
+                         rx_serial_data(j,:) = rx_raw_data(j,cp_len+1:end); %Remove CP
+                         rx_fft(:,j) = sqrt(1/Occupied_scs)*fft(rx_serial_data(j,:).',N_fft);
+                    end
+                    y = rx_fft;
+        
+                % === Alpha estimation == %
+                    if ismember(s, pilot_pos)
+                        alpha_m = zeros(N_bits_per_symb,1);
+        
+                        for k = 1:N_bits_per_symb
+                            r1 = y(k,1) - Hs(1,k)*pilot_matrix(k);
+                            r2 = y(k,2) - Hs(2,k)*pilot_matrix(k);
+                            alpha_m(k) = r1 / r2;
+                        end
+                        alpha = mean(alpha_m);
+                        true_alpha = Hj(1,:) ./ Hj(2,:); % Compare with true alpha (if known)
+                        
+                    end
+                        % disp([alpha, true_alpha(10)]);  % Example debug
+                % === Interference Cancellation === %
+                    rx_dec_data = zeros(N_bits_per_symb,1);
+                    for sub = 1 : Occupied_scs
+                        rx_dec_data(sub) = (y(sub,1) - alpha*y(sub,2))/(Hs(1,sub) - alpha*Hs(2,sub));
+                    end
+                % === Signal Demodulation and comparison === %
+                    dec_bits = pskdemod(rx_dec_data,Mod_ord);
+                    parallel_bits = pskdemod(parallel_data(:,(p-1)*(N_sym_pckt)+ s),Mod_ord);
+                    if all(dec_bits == parallel_bits)
+                        symbol_success = symbol_success + 1; % Count successful symbols
+                    end
+                end
+                if symbol_success == N_sym_pckt
+                    Packet_success = Packet_success + 1;
+                end
+            end
+            pdr_results(iter,i) = Packet_success/Num_pckts*100;
+        end
+        % fprintf("Trial %2d → PDR: %.2f%%\n", iter, pdr_results(iter,i));
     end
+    % fprintf("\nAverage PDR over %d trials: %.2f%%\n", num_trails, mean(pdr_results));
     
-end
+    final_pdr = mean(pdr_results,1);
+    % === Plotting PDR vs. Jamming Power ===
+    figure;
+    plot(SNR_dB, final_pdr, '-o', 'LineWidth', 2);
+    grid on;
+    xlabel('Signal to Noise Ratio(SNR) in dB');
+    ylabel('Packet Delivery Rate (PDR) [%]');
+    title('PDR vs. Jamming Power');
+    ylim([0 110]);
+    xlim([min(jamming_power) max(jamming_power) + 10]);
+% end
